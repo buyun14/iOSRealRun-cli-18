@@ -3,8 +3,7 @@ import multiprocessing
 
 from pymobiledevice3.lockdown import create_using_usbmux, LockdownClient
 
-from pymobiledevice3.cli.remote import install_driver_if_required
-from pymobiledevice3.cli.remote import select_device, RemoteServiceDiscoveryService
+from pymobiledevice3.cli.remote import RemoteServiceDiscoveryService
 from pymobiledevice3.cli.remote import start_tunnel
 from pymobiledevice3.cli.remote import verify_tunnel_imports
 
@@ -41,13 +40,6 @@ def reveal_developer_mode(lockdown: LockdownClient):
 
 def enable_developer_mode(lockdown: LockdownClient):
     AmfiService(lockdown).enable_developer_mode()
-
-def get_serverrsd():
-    install_driver_if_required()
-    if not verify_tunnel_imports():
-        exit(1)
-    return select_device(None)
-
 
 async def tunnel(rsd: RemoteServiceDiscoveryService, queue: multiprocessing.Queue):
     async with start_tunnel(rsd, None) as tunnel_result:

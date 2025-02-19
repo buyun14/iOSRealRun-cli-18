@@ -10,7 +10,10 @@ import random
 
 from geopy.distance import geodesic
 
-from driver import location
+
+from pymobiledevice3.remote.remote_service_discovery import RemoteServiceDiscoveryService
+from pymobiledevice3.services.dvt.instruments.location_simulation import LocationSimulation
+from pymobiledevice3.services.dvt.dvt_secure_socket_proxy import DvtSecureSocketProxyService
 
 def bd09Towgs84(position):
     wgs_p = {}
@@ -141,14 +144,18 @@ def run1(dvt, loc: list, v, dt=0.2):
     fixedLoc = randLoc(fixedLoc, n=n)  # a path will be divided into n parts for random route
     clock = time.time()
     for i in fixedLoc:
-        # utils.setLoc(bd09Towgs84(i))
-        location.set_location(dvt, **bd09Towgs84(i))
+        LocationSimulation(dvt).set(*bd09Towgs84(i).values())
         while time.time()-clock < dt:
             pass
         clock = time.time()
 
-def run(dvt, loc: list, v, d=15):
+async def run(address, port, loc: list, v, d=15):
     random.seed(time.time())
+    rsd = RemoteServiceDiscoveryService((address, port))
+    await rsd.connect()
+    dvt = DvtSecureSocketProxyService(rsd)
+    dvt.perform_handshake()
+
     while True:
         vRand = 1000/(1000/v-(2*random.random()-1)*d)
         run1(dvt, loc, vRand)

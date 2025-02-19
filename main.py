@@ -3,10 +3,6 @@ import logging
 import coloredlogs
 import os
 
-from driver import location
-
-from pymobiledevice3.cli.remote import RemoteServiceDiscoveryService
-from pymobiledevice3.cli.developer import DvtSecureSocketProxyService
 
 from init import init
 from init import tunnel
@@ -15,6 +11,7 @@ from init import route
 import run
 
 import config
+import asyncio
 
 
 debug = os.environ.get("DEBUG", False)
@@ -34,7 +31,7 @@ logging.getLogger('urllib3.connectionpool').setLevel(logging.DEBUG if debug else
 
 
 
-def main():
+async def main():
     # set level
     logger = logging.getLogger(__name__)
     coloredlogs.install(level=logging.INFO)
@@ -51,7 +48,6 @@ def main():
     original_sigint_handler = signal.signal(signal.SIGINT, signal.SIG_IGN)
     process, address, port = tunnel.tunnel()
     signal.signal(signal.SIGINT, original_sigint_handler)
-    logger.info("tunnel started")
     try:
         logger.debug(f"tunnel address: {address}, port: {port}")
 
@@ -59,23 +55,17 @@ def main():
         loc = route.get_route()
         logger.info(f"got route from {config.config.routeConfig}")
 
-
-        with RemoteServiceDiscoveryService((address, port)) as rsd:
-            with DvtSecureSocketProxyService(rsd) as dvt:
-                try:
-                    print(f"已开始模拟跑步，速度大约为 {config.config.v} m/s")
-                    print("会无限循环，按 Ctrl+C 退出")
-                    print("请勿直接关闭窗口，否则无法还原正常定位")
-                    run.run(dvt, loc, config.config.v)
-                except KeyboardInterrupt:
-                    logger.debug("get KeyboardInterrupt (inner)")
-                    logger.debug(f"Is process alive? {process.is_alive()}")
-                finally:
-                    logger.debug(f"Is process alive? {process.is_alive()}")
-                    logger.debug("Start to clear location")
-                    location.clear_location(dvt)
-                    logger.info("Location cleared")
-
+        try:
+            print(f"已开始模拟跑步，速度大约为 {config.config.v} m/s")
+            print("会无限循环，按 Ctrl+C 退出")
+            print("请勿直接关闭窗口，否则无法还原正常定位")
+            await run.run(address, port, loc, config.config.v)
+        except KeyboardInterrupt:
+            logger.debug("get KeyboardInterrupt (inner)")
+            logger.debug(f"Is process alive? {process.is_alive()}")
+        finally:
+            logger.debug(f"Is process alive? {process.is_alive()}")
+            logger.debug("Start to clear location")
 
     except KeyboardInterrupt:
         logger.debug("get KeyboardInterrupt (outer)")
@@ -90,4 +80,4 @@ def main():
 
     
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
