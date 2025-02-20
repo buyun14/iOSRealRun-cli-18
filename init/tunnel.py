@@ -6,9 +6,7 @@ import multiprocessing
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 def start_tunnel(queue):
-    command = ['python3', '-m', 'pymobiledevice3', 'remote', 'start-tunnel']
-
-    logging.info("Tunnel started")
+    command = ['python3', '-m', 'pymobiledevice3', 'lockdown', 'start-tunnel']
 
     process = subprocess.Popen(
         command,
@@ -16,6 +14,8 @@ def start_tunnel(queue):
         stderr=subprocess.STDOUT,
         text=True
     )
+
+    logging.info("Tunnel started")
 
     rsd_pattern = re.compile(r"--rsd (\S+) (\d+)")
     address, port = None, None
