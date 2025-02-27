@@ -2,6 +2,8 @@
 
 本项目基于 [iOSRealRun-cli-17](https://github.com/iOSRealRun/iOSRealRun-cli-17) 修改而来，并更新了依赖的 [pymobiledevice3](https://github.com/doronz88/pymobiledevice3)。
 
+如果使用时出现了无法解决的报错可以考虑使用[这个仓库手动启动](https://github.com/BiancoChiu/iOSEasyRun)。
+
 测试环境：
 - 操作系统：MacOS
 - Python版本：3.13
@@ -11,7 +13,7 @@
 
 ### 前置条件
 
-1. 系统是 `Windows` 或 `MacOS`（Windows暂未测试，出现问题请提issue）
+1. 系统是 `Windows` 或 `MacOS`
 2. iPhone 或 iPad 系统版本大于等于 18（也许17的一些后期版本也可以用，未经测试）
 3. Windows 需要安装 iTunes
 4. 已安装 `Python3` 和 `pip3`
