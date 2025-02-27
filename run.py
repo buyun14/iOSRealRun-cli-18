@@ -7,9 +7,9 @@ automatically run the route
 import math
 import time
 import random
+import asyncio
 
 from geopy.distance import geodesic
-
 
 from pymobiledevice3.remote.remote_service_discovery import RemoteServiceDiscoveryService
 from pymobiledevice3.services.dvt.instruments.location_simulation import LocationSimulation
@@ -152,6 +152,7 @@ def run1(dvt, loc: list, v, dt=0.2):
 async def run(address, port, loc: list, v, d=15):
     random.seed(time.time())
     rsd = RemoteServiceDiscoveryService((address, port))
+    await asyncio.sleep(2)
     await rsd.connect()
     dvt = DvtSecureSocketProxyService(rsd)
     dvt.perform_handshake()
