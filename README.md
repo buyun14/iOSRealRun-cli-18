@@ -5,7 +5,7 @@
 如果使用时出现了无法解决的报错可以考虑使用[这个仓库手动启动](https://github.com/BiancoChiu/iOSEasyRun)。
 
 测试环境：
-- 操作系统：MacOS
+- 操作系统：MacOS，Windows11
 - Python版本：3.13
 - iOS版本：18.3.1
 
