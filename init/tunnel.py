@@ -7,7 +7,6 @@ import multiprocessing
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 def start_tunnel(queue):
-    # command = ['python3', '-m', 'pymobiledevice3', 'lockdown', 'start-tunnel']
     command = [sys.executable, '-m', 'pymobiledevice3', 'lockdown', 'start-tunnel']
 
     process = subprocess.Popen(
@@ -56,7 +55,3 @@ def tunnel():
             process.kill()
 
     return None, None, None
-
-# if __name__ == "__main__":
-#     address, port = start_tunnel()
-#     print(f"RSD Address: {address}, RSD Port: {port}....")

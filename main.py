@@ -2,6 +2,7 @@ import signal
 import logging
 import coloredlogs
 import os
+import asyncio
 
 
 from init import init
@@ -9,14 +10,12 @@ from init import tunnel
 from init import route
 
 import run
-
 import config
-import asyncio
+
 
 
 debug = os.environ.get("DEBUG", False)
 
-# set logging level
 coloredlogs.install(level=logging.INFO)
 logging.getLogger('wintun').setLevel(logging.DEBUG if debug else logging.WARNING)
 logging.getLogger('quic').setLevel(logging.DEBUG if debug else logging.WARNING)
@@ -32,7 +31,6 @@ logging.getLogger('urllib3.connectionpool').setLevel(logging.DEBUG if debug else
 
 
 async def main():
-    # set level
     logger = logging.getLogger(__name__)
     coloredlogs.install(level=logging.INFO)
     logger.setLevel(logging.INFO)
@@ -43,15 +41,13 @@ async def main():
     init.init()
     logger.info("init done")
 
-    # start the tunnel in another process
-    logger.info("starting tunnel")
+    logger.info("trying to start tunnel")
     original_sigint_handler = signal.signal(signal.SIGINT, signal.SIG_IGN)
     process, address, port = tunnel.tunnel()
     signal.signal(signal.SIGINT, original_sigint_handler)
     try:
         logger.debug(f"tunnel address: {address}, port: {port}")
 
-        # get route
         loc = route.get_route()
         logger.info(f"got route from {config.config.routeConfig}")
 
@@ -70,7 +66,6 @@ async def main():
     except KeyboardInterrupt:
         logger.debug("get KeyboardInterrupt (outer)")
     finally:
-        # stop the tunnel process
         logger.debug(f"Is process alive? {process.is_alive()}")
         logger.debug("terminating tunnel process")
         process.terminate()
