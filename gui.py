@@ -6,7 +6,9 @@ import os
 import signal
 import logging
 import coloredlogs
+import json
 from pathlib import Path
+from datetime import datetime
 
 from init import init
 from init import tunnel
@@ -156,17 +158,27 @@ class iOSRealRunGUI:
             ("JSON文件", "*.json"),
             ("所有文件", "*.*")
         ]
-        filename = filedialog.askopenfilename(
-            title="选择路径文件",
-            filetypes=filetypes,
-            initialdir=os.getcwd()
-        )
-        if filename:
-            self.route_file_var.set(filename)
+        try:
+            filename = filedialog.askopenfilename(
+                title="选择路径文件",
+                filetypes=filetypes,
+                initialdir=os.getcwd()
+            )
+            if filename:
+                # 确保路径使用正确的编码
+                self.route_file_var.set(filename)
+                self.log_message(f"已选择路径文件: {Path(filename).name}")
+        except Exception as e:
+            self.log_message(f"选择文件时出错: {e}")
+            messagebox.showerror("错误", f"选择文件时出错: {e}")
             
     def open_route_manager(self):
         """打开路径管理器"""
         self.route_manager_gui.show_route_manager()
+        
+    def _get_current_time(self):
+        """获取当前时间字符串"""
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
     def load_config(self):
         """加载配置"""
@@ -295,15 +307,61 @@ class iOSRealRunGUI:
                     self.log_message(f"加载JSON路径失败: {e}")
                     raise
             else:
-                # 传统txt格式
-                original_route_config = config.config.routeConfig
-                config.config.routeConfig = route_file
-                
-                loc = route.get_route()
-                self.log_message(f"从TXT文件 {route_file} 获取路径")
-                
-                # 恢复原始配置
-                config.config.routeConfig = original_route_config
+                # 传统txt格式 - 自动转换为JSON
+                self.log_message(f"检测到TXT格式路径文件，正在自动转换...")
+                try:
+                    # 读取TXT文件内容
+                    with open(route_file, 'r', encoding='utf-8') as f:
+                        content = f.read().strip()
+                    
+                    # 解析坐标
+                    from util.route import parse_route
+                    coordinates = parse_route(content)
+                    
+                    # 生成JSON文件名
+                    txt_path = Path(route_file)
+                    json_name = f"{txt_path.stem}_converted"
+                    json_path = self.route_manager.routes_dir / f"{json_name}.json"
+                    
+                    # 计算距离
+                    distance = self.route_manager.calculate_route_distance(coordinates)
+                    
+                    # 创建元数据
+                    metadata = {
+                        "description": f"从 {txt_path.name} 自动转换",
+                        "distance": distance,
+                        "created": self._get_current_time(),
+                        "source": str(route_file),
+                        "format": "json"
+                    }
+                    
+                    # 保存为JSON
+                    route_data = {
+                        "name": json_name,
+                        "coordinates": coordinates,
+                        "metadata": metadata
+                    }
+                    
+                    with open(json_path, 'w', encoding='utf-8') as f:
+                        json.dump(route_data, f, indent=2, ensure_ascii=False)
+                    
+                    self.log_message(f"已自动转换为JSON格式: {json_path.name}")
+                    self.log_message(f"路径距离: {distance:.1f}米")
+                    
+                    # 使用转换后的JSON文件
+                    loc = coordinates
+                    
+                except Exception as e:
+                    self.log_message(f"自动转换失败，使用原始TXT格式: {e}")
+                    # 回退到原始方式
+                    original_route_config = config.config.routeConfig
+                    config.config.routeConfig = route_file
+                    
+                    loc = route.get_route()
+                    self.log_message(f"从TXT文件 {route_file} 获取路径")
+                    
+                    # 恢复原始配置
+                    config.config.routeConfig = original_route_config
             
             # 更新状态
             self.status_var.set("正在跑步...")

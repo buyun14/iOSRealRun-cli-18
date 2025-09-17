@@ -40,7 +40,10 @@ class RouteManager:
             }
         }
         
-        file_path = self.routes_dir / f"{route_name}.json"
+        # 确保路径名称安全（处理中文字符）
+        safe_name = self._make_safe_filename(route_name)
+        file_path = self.routes_dir / f"{safe_name}.json"
+        
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(route_data, f, indent=2, ensure_ascii=False)
             
@@ -240,6 +243,16 @@ class RouteManager:
         """获取当前时间字符串"""
         from datetime import datetime
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+    def _make_safe_filename(self, filename: str) -> str:
+        """创建安全的文件名，支持中文字符"""
+        import re
+        # 移除或替换不安全的字符
+        safe_name = re.sub(r'[<>:"/\\|?*]', '_', filename)
+        # 确保文件名不为空
+        if not safe_name.strip():
+            safe_name = "untitled"
+        return safe_name
 
 
 class RouteManagerGUI:
