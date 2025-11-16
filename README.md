@@ -1,11 +1,9 @@
 # iOSRealRun-cli-18
 
-本项目基于 [iOSRealRun-cli-17](https://github.com/iOSRealRun/iOSRealRun-cli-17) 修改而来，并更新了依赖的 [pymobiledevice3](https://github.com/doronz88/pymobiledevice3)。
-
-如果使用时出现了无法解决的报错可以考虑使用[这个仓库手动启动](https://github.com/BiancoChiu/iOSEasyRun)。
+原 [iOSRealRun-cli-18](https://github.com/MTDickens/iOSRealRun-cli-18) 的 GUI 版本
 
 测试环境：
-- 操作系统：MacOS，Windows11
+- 操作系统：Windows11
 - Python版本：3.13
 - iOS版本：18.3.1
 
@@ -26,12 +24,10 @@
 #### 方式一：GUI界面（推荐）
 
 1. 克隆本项目到本地并进入项目目录
-2. 安装依赖（建议使用虚拟环境）  
+2. 安装依赖（建议使用虚拟环境 `python -m venv .venv`并激活`.venv\Scripts\activate #windows`或`source .venv/bin/activate #linux`）  
     ```shell
-    pip3 install -r requirements.txt
+    pip install -r requirements.txt
     ```
-    如果 `pip3` 无法安装，请使用 `pip` 替代  
-    如果提示没有需要的版本，请尝试不适用国内源  
 
 3. 将设备连接到电脑，解锁，如果请求信任的提示框，请点击信任
 4. 打开终端（cmd 或 PowerShell），执行以下命令获取DDI（可能可以跳过）
@@ -67,15 +63,14 @@
     sudo python3 start.py --cli
     ```
 
-### GUI界面功能
 
-- **路径管理**: 支持导入、导出、转换路径文件格式
-- **可视化配置**: 通过滑块调整跑步速度和速度变化范围
-- **实时日志**: 显示运行状态和详细日志信息
-- **一键操作**: 开始/停止跑步模拟，保存配置
-- **路径预览**: 查看路径详情，包括距离、坐标数量等
+### 路径文件
 
-### 路径文件格式
+打开[路径拾取网站](https://fakerun.myth.cx/)。通过点击地图构造路径。点击时无需考虑间距，会自动用直线连接。路径点击完成后，单击上方的路径坐标——复制，将坐标数据复制到剪贴板,然后找个位置记事本保存为`txt`文件即可。（后续在GUI中选择）
+**注意：只画一圈即可**
+比如六个坐标点（六边形）基本已经可以表示操场一圈了，程序会自动重复。
+
+> 已预置`xingcao.txt`（如果你是NWPU）
 
 项目现在支持两种路径文件格式：
 
@@ -105,8 +100,23 @@
 5. 使用"停止跑步"按钮安全退出
 6. 可以通过"路径管理"按钮管理路径文件
 
-### 自定义配置文件
+~~### 自定义配置文件~~(可GUI调整)
 
 - 若希望修改速度，请在 config.yaml 中修改 v
     - 默认的 `4.2 m/s`，就是大约 `4 min/km` 的水平
 - 若需修改配置文件，请在 config.yaml 中修改 routeConfig
+
+### 相关项目或依赖
+
+ios18: https://github.com/MTDickens/iOSRealRun-cli-18.git
+
+iso17: https://github.com/iOSRealRun/iOSRealRun-cli-17.git
+
+ios16及以下(windows/Mac): https://github.com/iOSRealRun/iOSRealRun-cli.git
+
+ios16及以下(windows): https://github.com/Mythologyli/iOSFakeRun.git
+
+依赖：
+
+https://github.com/libimobiledevice/libimobiledevice.git
+https://github.com/doronz88/pymobiledevice3.git
