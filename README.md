@@ -34,7 +34,7 @@
     如果提示没有需要的版本，请尝试不适用国内源  
 
 3. 将设备连接到电脑，解锁，如果请求信任的提示框，请点击信任
-4. 打开终端（cmd 或 PowerShell），执行以下命令获取DDI
+4. 打开终端（cmd 或 PowerShell），执行以下命令获取DDI（可能可以跳过）
     ```shell
     pymobiledevice3 mounter auto-mount
     ```

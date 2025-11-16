@@ -1,5 +1,5 @@
-import tkinter as tk
-from tkinter import ttk, filedialog, messagebox, scrolledtext
+import customtkinter as ctk
+from tkinter import filedialog, messagebox
 import threading
 import asyncio
 import os
@@ -17,12 +17,44 @@ import run
 import config
 from route_manager import RouteManager, RouteManagerGUI
 
+# 设置 CustomTkinter 外观模式
+ctk.set_appearance_mode("dark")  # 可选: "light", "dark", "system"
+ctk.set_default_color_theme("blue")  # 可选: "blue", "green", "dark-blue"
+
+# 定义两套配色方案
+THEME_COLORS = {
+    "dark": {
+        "bg": "#1a1a1a",
+        "fg": "#2b2b2b",
+        "border": "#3a3a3a",
+        "text": "#ffffff",
+        "text_secondary": "#b0b0b0",
+        "accent": "#1f6aa5",
+        "success": "#2fa572",
+        "danger": "#d32f2f",
+        "card_bg": "#242424",
+        "card_border": "#3a3a3a"
+    },
+    "light": {
+        "bg": "#f0f0f0",
+        "fg": "#ffffff",
+        "border": "#d0d0d0",
+        "text": "#1a1a1a",
+        "text_secondary": "#666666",
+        "accent": "#1f6aa5",
+        "success": "#2fa572",
+        "danger": "#d32f2f",
+        "card_bg": "#ffffff",
+        "card_border": "#d0d0d0"
+    }
+}
+
 
 class iOSRealRunGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("iOS Real Run - 跑步模拟器")
-        self.root.geometry("600x500")
+        self.root.geometry("800x600")
         self.root.resizable(True, True)
         
         # 运行状态
@@ -31,9 +63,16 @@ class iOSRealRunGUI:
         self.tunnel_address = None
         self.tunnel_port = None
         
+        # 主题状态
+        self.current_theme = "dark"
+        self.theme_colors = THEME_COLORS["dark"]
+        
         # 路径管理器
         self.route_manager = RouteManager()
         self.route_manager_gui = RouteManagerGUI(root)
+        
+        # 自动保存定时器
+        self.auto_save_timer = None
         
         # 设置日志
         self.setup_logging()
@@ -51,109 +90,404 @@ class iOSRealRunGUI:
         self.logger.setLevel(logging.INFO)
         
     def create_widgets(self):
-        """创建GUI组件"""
-        # 主框架
-        main_frame = ttk.Frame(self.root, padding="10")
-        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        """创建GUI组件 - 使用卡片式布局"""
+        # 主容器
+        main_container = ctk.CTkFrame(self.root)
+        main_container.pack(fill="both", expand=True, padx=20, pady=20)
         
-        # 配置网格权重
-        self.root.columnconfigure(0, weight=1)
-        self.root.rowconfigure(0, weight=1)
-        main_frame.columnconfigure(1, weight=1)
+        # 顶部标题栏
+        header_frame = ctk.CTkFrame(main_container, fg_color="transparent")
+        header_frame.pack(fill="x", pady=(0, 20))
         
-        # 标题
-        title_label = ttk.Label(main_frame, text="iOS Real Run - 跑步模拟器", 
-                               font=("Arial", 16, "bold"))
-        title_label.grid(row=0, column=0, columnspan=3, pady=(0, 20))
+        title_label = ctk.CTkLabel(
+            header_frame, 
+            text="🏃 iOS Real Run - 跑步模拟器",
+            font=ctk.CTkFont(size=20, weight="bold")
+        )
+        title_label.pack(side="left")
+        
+        # 状态指示器和主题切换（右侧）
+        status_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+        status_frame.pack(side="right")
+        
+        # 主题切换按钮
+        current_mode = ctk.get_appearance_mode()
+        theme_icon = "☀️" if current_mode == "dark" else "🌙"
+        self.theme_button = ctk.CTkButton(
+            status_frame,
+            text=theme_icon,
+            command=self.toggle_theme,
+            width=40,
+            height=30,
+            font=ctk.CTkFont(size=16),
+            fg_color="transparent",
+            hover_color=("gray70", "gray30")
+        )
+        self.theme_button.pack(side="left", padx=(0, 15))
+        
+        self.status_indicator = ctk.CTkLabel(
+            status_frame,
+            text="●",
+            font=ctk.CTkFont(size=16),
+            text_color="gray"
+        )
+        self.status_indicator.pack(side="left", padx=(0, 10))
+        
+        self.status_var = ctk.StringVar(value="就绪")
+        self.status_label = ctk.CTkLabel(
+            status_frame,
+            textvariable=self.status_var,
+            font=ctk.CTkFont(size=14)
+        )
+        self.status_label.pack(side="left")
+        
+        # 主要内容区域 - 使用两列布局
+        content_frame = ctk.CTkFrame(main_container, fg_color="transparent")
+        content_frame.pack(fill="both", expand=True)
+        
+        # 左列：配置卡片
+        left_column = ctk.CTkFrame(content_frame, fg_color="transparent")
+        left_column.pack(side="left", fill="both", expand=True, padx=(0, 10))
+        
+        # 路径配置卡片（增强边框）
+        route_card = ctk.CTkFrame(left_column, border_width=2, border_color=THEME_COLORS[self.current_theme]["card_border"])
+        route_card.pack(fill="x", pady=(0, 15))
+        self.route_card = route_card  # 保存引用以便主题切换时更新
+        
+        ctk.CTkLabel(
+            route_card,
+            text="📍 路径配置",
+            font=ctk.CTkFont(size=16, weight="bold")
+        ).pack(anchor="w", pady=(15, 10), padx=20)
         
         # 路径文件选择
-        ttk.Label(main_frame, text="路径文件:").grid(row=1, column=0, sticky=tk.W, pady=5)
-        self.route_file_var = tk.StringVar()
-        self.route_file_entry = ttk.Entry(main_frame, textvariable=self.route_file_var, width=40)
-        self.route_file_entry.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=(5, 5), pady=5)
-        ttk.Button(main_frame, text="浏览", command=self.browse_route_file).grid(row=1, column=2, pady=5)
-        ttk.Button(main_frame, text="管理", command=self.open_route_manager).grid(row=1, column=3, padx=(5, 0), pady=5)
+        route_input_frame = ctk.CTkFrame(route_card, fg_color="transparent")
+        route_input_frame.pack(fill="x", padx=20, pady=(0, 10))
         
-        # 速度设置
-        ttk.Label(main_frame, text="跑步速度 (m/s):").grid(row=2, column=0, sticky=tk.W, pady=5)
-        self.speed_var = tk.DoubleVar(value=4.2)
-        speed_frame = ttk.Frame(main_frame)
-        speed_frame.grid(row=2, column=1, sticky=(tk.W, tk.E), padx=(5, 0), pady=5)
-        speed_frame.columnconfigure(0, weight=1)
+        self.route_file_var = ctk.StringVar()
+        self.route_file_entry = ctk.CTkEntry(
+            route_input_frame,
+            textvariable=self.route_file_var,
+            placeholder_text="选择路径文件...",
+            height=35
+        )
+        self.route_file_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
         
-        self.speed_scale = ttk.Scale(speed_frame, from_=1.0, to=10.0, 
-                                   variable=self.speed_var, orient=tk.HORIZONTAL)
-        self.speed_scale.grid(row=0, column=0, sticky=(tk.W, tk.E))
-        self.speed_label = ttk.Label(speed_frame, text="4.2")
-        self.speed_label.grid(row=0, column=1, padx=(5, 0))
+        route_button_frame = ctk.CTkFrame(route_input_frame, fg_color="transparent")
+        route_button_frame.pack(side="right")
+        
+        ctk.CTkButton(
+            route_button_frame,
+            text="浏览",
+            command=self.browse_route_file,
+            width=80,
+            height=35
+        ).pack(side="left", padx=(0, 5))
+        
+        ctk.CTkButton(
+            route_button_frame,
+            text="管理",
+            command=self.open_route_manager,
+            width=80,
+            height=35,
+            fg_color="gray",
+            hover_color="darkgray"
+        ).pack(side="left")
+        
+        # 速度设置卡片（可折叠，增强边框）
+        speed_card = ctk.CTkFrame(left_column, border_width=2, border_color=THEME_COLORS[self.current_theme]["card_border"])
+        speed_card.pack(fill="x", pady=(0, 15))
+        self.speed_card = speed_card  # 保存引用以便主题切换时更新
+        
+        # 速度设置标题栏（可点击折叠）
+        speed_header = ctk.CTkFrame(speed_card, fg_color="transparent")
+        speed_header.pack(fill="x", padx=20, pady=(15, 0))
+        
+        self.speed_expanded = ctk.BooleanVar(value=False)  # 默认折叠
+        
+        speed_title_frame = ctk.CTkFrame(speed_header, fg_color="transparent")
+        speed_title_frame.pack(side="left", fill="x", expand=True)
+        
+        speed_title_frame.bind("<Button-1>", lambda e: self.toggle_speed_settings())
+        for widget in speed_title_frame.winfo_children():
+            widget.bind("<Button-1>", lambda e: self.toggle_speed_settings())
+        
+        self.speed_toggle_label = ctk.CTkLabel(
+            speed_title_frame,
+            text="▶ ⚡ 速度设置",  # 默认折叠，显示▶
+            font=ctk.CTkFont(size=16, weight="bold"),
+            cursor="hand2"
+        )
+        self.speed_toggle_label.pack(side="left")
+        self.speed_toggle_label.bind("<Button-1>", lambda e: self.toggle_speed_settings())
+        
+        # 速度设置内容区域（可折叠，默认隐藏）
+        self.speed_content_frame = ctk.CTkFrame(speed_card, fg_color="transparent")
+        # 默认不显示（折叠状态）
+        
+        # 跑步速度
+        speed_setting_frame = ctk.CTkFrame(self.speed_content_frame, fg_color="transparent")
+        speed_setting_frame.pack(fill="x", pady=(0, 10))
+        
+        speed_label_frame = ctk.CTkFrame(speed_setting_frame, fg_color="transparent")
+        speed_label_frame.pack(fill="x", pady=(0, 6))
+        
+        ctk.CTkLabel(
+            speed_label_frame,
+            text="跑步速度:",
+            font=ctk.CTkFont(size=13)
+        ).pack(side="left")
+        
+        self.speed_var = ctk.DoubleVar(value=4.2)
+        self.speed_value_label = ctk.CTkLabel(
+            speed_label_frame,
+            text="4.2 m/s",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color="#1f6aa5"
+        )
+        self.speed_value_label.pack(side="right")
+        
+        self.speed_slider = ctk.CTkSlider(
+            speed_setting_frame,
+            from_=1.0,
+            to=10.0,
+            variable=self.speed_var,
+            command=self.update_speed_label,
+            height=18
+        )
+        self.speed_slider.pack(fill="x")
+        
+        speed_range_frame = ctk.CTkFrame(speed_setting_frame, fg_color="transparent")
+        speed_range_frame.pack(fill="x", pady=(3, 0))
+        
+        ctk.CTkLabel(
+            speed_range_frame,
+            text="1.0",
+            font=ctk.CTkFont(size=9),
+            text_color="gray"
+        ).pack(side="left")
+        
+        ctk.CTkLabel(
+            speed_range_frame,
+            text="10.0",
+            font=ctk.CTkFont(size=9),
+            text_color="gray"
+        ).pack(side="right")
         
         # 速度变化范围
-        ttk.Label(main_frame, text="速度变化范围 (%):").grid(row=3, column=0, sticky=tk.W, pady=5)
-        self.speed_variation_var = tk.IntVar(value=15)
-        variation_frame = ttk.Frame(main_frame)
-        variation_frame.grid(row=3, column=1, sticky=(tk.W, tk.E), padx=(5, 0), pady=5)
-        variation_frame.columnconfigure(0, weight=1)
+        variation_setting_frame = ctk.CTkFrame(self.speed_content_frame, fg_color="transparent")
+        variation_setting_frame.pack(fill="x", pady=(0, 0))
         
-        self.variation_scale = ttk.Scale(variation_frame, from_=0, to=50, 
-                                       variable=self.speed_variation_var, orient=tk.HORIZONTAL)
-        self.variation_scale.grid(row=0, column=0, sticky=(tk.W, tk.E))
-        self.variation_label = ttk.Label(variation_frame, text="15")
-        self.variation_label.grid(row=0, column=1, padx=(5, 0))
+        variation_label_frame = ctk.CTkFrame(variation_setting_frame, fg_color="transparent")
+        variation_label_frame.pack(fill="x", pady=(0, 8))
         
-        # 控制按钮
-        button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=4, column=0, columnspan=3, pady=20)
+        ctk.CTkLabel(
+            variation_label_frame,
+            text="速度变化范围:",
+            font=ctk.CTkFont(size=13)
+        ).pack(side="left")
         
-        self.start_button = ttk.Button(button_frame, text="开始跑步", 
-                                     command=self.start_running, style="Accent.TButton")
-        self.start_button.pack(side=tk.LEFT, padx=(0, 10))
+        self.speed_variation_var = ctk.IntVar(value=15)
+        self.variation_value_label = ctk.CTkLabel(
+            variation_label_frame,
+            text="15%",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color="#1f6aa5"
+        )
+        self.variation_value_label.pack(side="right")
         
-        self.stop_button = ttk.Button(button_frame, text="停止跑步", 
-                                    command=self.stop_running, state=tk.DISABLED)
-        self.stop_button.pack(side=tk.LEFT, padx=(0, 10))
+        self.variation_slider = ctk.CTkSlider(
+            variation_setting_frame,
+            from_=0,
+            to=50,
+            variable=self.speed_variation_var,
+            command=self.update_variation_label,
+            height=18
+        )
+        self.variation_slider.pack(fill="x")
         
-        self.save_config_button = ttk.Button(button_frame, text="保存配置", 
-                                           command=self.save_config)
-        self.save_config_button.pack(side=tk.LEFT, padx=(0, 10))
+        variation_range_frame = ctk.CTkFrame(variation_setting_frame, fg_color="transparent")
+        variation_range_frame.pack(fill="x", pady=(3, 0))
         
-        self.route_manager_button = ttk.Button(button_frame, text="路径管理", 
-                                             command=self.open_route_manager)
-        self.route_manager_button.pack(side=tk.LEFT)
+        ctk.CTkLabel(
+            variation_range_frame,
+            text="0%",
+            font=ctk.CTkFont(size=9),
+            text_color="gray"
+        ).pack(side="left")
         
-        # 状态显示
-        ttk.Label(main_frame, text="状态:").grid(row=5, column=0, sticky=tk.W, pady=(10, 5))
-        self.status_var = tk.StringVar(value="就绪")
-        self.status_label = ttk.Label(main_frame, textvariable=self.status_var, 
-                                    foreground="green")
-        self.status_label.grid(row=5, column=1, sticky=tk.W, padx=(5, 0), pady=(10, 5))
+        ctk.CTkLabel(
+            variation_range_frame,
+            text="50%",
+            font=ctk.CTkFont(size=9),
+            text_color="gray"
+        ).pack(side="right")
         
-        # 日志显示区域
-        ttk.Label(main_frame, text="运行日志:").grid(row=6, column=0, sticky=tk.W, pady=(10, 5))
+        # 右列：控制按钮
+        right_column = ctk.CTkFrame(content_frame, fg_color="transparent")
+        right_column.pack(side="right", fill="both", expand=False, padx=(10, 0))
         
-        log_frame = ttk.Frame(main_frame)
-        log_frame.grid(row=7, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=5)
-        log_frame.columnconfigure(0, weight=1)
-        log_frame.rowconfigure(0, weight=1)
-        main_frame.rowconfigure(7, weight=1)
+        # 控制按钮卡片（增强边框）
+        control_card = ctk.CTkFrame(right_column, border_width=2, border_color=THEME_COLORS[self.current_theme]["card_border"])
+        control_card.pack(fill="x", pady=(0, 15))
+        self.control_card = control_card  # 保存引用以便主题切换时更新
         
-        self.log_text = scrolledtext.ScrolledText(log_frame, height=15, width=70)
-        self.log_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        ctk.CTkLabel(
+            control_card,
+            text="🎮 控制面板",
+            font=ctk.CTkFont(size=16, weight="bold")
+        ).pack(anchor="w", pady=(15, 10), padx=20)
         
-        # 绑定事件
-        self.speed_scale.configure(command=self.update_speed_label)
-        self.variation_scale.configure(command=self.update_variation_label)
+        # 主要控制按钮 - 2x2 网格布局
+        button_container = ctk.CTkFrame(control_card, fg_color="transparent")
+        button_container.pack(fill="both", expand=True, padx=20, pady=(0, 15))
+        
+        # 配置网格权重
+        button_container.grid_columnconfigure(0, weight=1)
+        button_container.grid_columnconfigure(1, weight=1)
+        button_container.grid_rowconfigure(0, weight=1)
+        button_container.grid_rowconfigure(1, weight=1)
+        
+        # 第一行：开始和停止按钮
+        self.start_button = ctk.CTkButton(
+            button_container,
+            text="▶ 开始",
+            command=self.start_running,
+            height=45,
+            font=ctk.CTkFont(size=14, weight="bold"),
+            fg_color="#2fa572",
+            hover_color="#228b63"
+        )
+        self.start_button.grid(row=0, column=0, padx=(0, 5), pady=(0, 5), sticky="nsew")
+        
+        self.stop_button = ctk.CTkButton(
+            button_container,
+            text="⏹ 停止",
+            command=self.stop_running,
+            height=45,
+            font=ctk.CTkFont(size=14, weight="bold"),
+            fg_color="#d32f2f",
+            hover_color="#b71c1c",
+            state="disabled"
+        )
+        self.stop_button.grid(row=0, column=1, padx=(5, 0), pady=(0, 5), sticky="nsew")
+        
+        # 第二行：保存配置和路径管理按钮
+        save_button = ctk.CTkButton(
+            button_container,
+            text="💾 保存",
+            command=self.save_config,
+            height=45,
+            font=ctk.CTkFont(size=13),
+            fg_color="gray",
+            hover_color="darkgray"
+        )
+        save_button.grid(row=1, column=0, padx=(0, 5), pady=(5, 0), sticky="nsew")
+        
+        route_button = ctk.CTkButton(
+            button_container,
+            text="📁 管理",
+            command=self.open_route_manager,
+            height=45,
+            font=ctk.CTkFont(size=13),
+            fg_color="gray",
+            hover_color="darkgray"
+        )
+        route_button.grid(row=1, column=1, padx=(5, 0), pady=(5, 0), sticky="nsew")
+        
+        # 底部日志区域（增大占比，增强边框）
+        log_card = ctk.CTkFrame(main_container, border_width=2, border_color=THEME_COLORS[self.current_theme]["card_border"])
+        log_card.pack(fill="both", expand=True, pady=(15, 0))
+        self.log_card = log_card  # 保存引用以便主题切换时更新
+        
+        log_header = ctk.CTkFrame(log_card, fg_color="transparent")
+        log_header.pack(fill="x", padx=20, pady=(15, 10))
+        
+        ctk.CTkLabel(
+            log_header,
+            text="📋 运行日志",
+            font=ctk.CTkFont(size=16, weight="bold")
+        ).pack(side="left")
+        
+        # 日志文本框（增大高度）
+        log_container = ctk.CTkFrame(log_card, fg_color="transparent")
+        log_container.pack(fill="both", expand=True, padx=20, pady=(0, 15))
+        
+        self.log_text = ctk.CTkTextbox(
+            log_container,
+            height=300,
+            font=ctk.CTkFont(size=12),
+            wrap="word"
+        )
+        self.log_text.pack(fill="both", expand=True)
         
     def update_speed_label(self, value):
         """更新速度标签"""
-        self.speed_label.config(text=f"{float(value):.1f}")
+        speed = float(value)
+        self.speed_value_label.configure(text=f"{speed:.1f} m/s")
+        # 自动保存配置（延迟保存，避免频繁写入）
+        self.auto_save_config()
         
     def update_variation_label(self, value):
         """更新变化范围标签"""
-        self.variation_label.config(text=f"{int(float(value))}")
+        variation = int(float(value))
+        self.variation_value_label.configure(text=f"{variation}%")
+        # 自动保存配置（延迟保存，避免频繁写入）
+        self.auto_save_config()
+        
+    def toggle_speed_settings(self):
+        """切换速度设置区域的显示/隐藏"""
+        if self.speed_expanded.get():
+            self.speed_content_frame.pack_forget()
+            self.speed_toggle_label.configure(text="▶ ⚡ 速度设置")
+            self.speed_expanded.set(False)
+        else:
+            self.speed_content_frame.pack(fill="x", padx=20, pady=(10, 15))
+            self.speed_toggle_label.configure(text="▼ ⚡ 速度设置")
+            self.speed_expanded.set(True)
+            
+    def toggle_theme(self):
+        """切换亮暗模式 - 手动实现配色切换"""
+        if self.current_theme == "dark":
+            self.current_theme = "light"
+            new_icon = "🌙"
+        else:
+            self.current_theme = "dark"
+            new_icon = "☀️"
+        
+        # 更新主题颜色
+        self.theme_colors = THEME_COLORS[self.current_theme]
+        
+        # 设置 CustomTkinter 主题
+        ctk.set_appearance_mode(self.current_theme)
+        
+        # 更新按钮图标
+        self.theme_button.configure(text=new_icon)
+        
+        # 更新所有卡片的边框颜色
+        self._update_theme_colors()
+        
+        # 强制更新所有窗口
+        self.root.update_idletasks()
+        self.root.update()
+        
+    def _update_theme_colors(self):
+        """更新所有组件的主题颜色"""
+        # 更新所有卡片的边框颜色
+        border_color = self.theme_colors["card_border"]
+        if hasattr(self, 'route_card'):
+            self.route_card.configure(border_color=border_color)
+        if hasattr(self, 'speed_card'):
+            self.speed_card.configure(border_color=border_color)
+        if hasattr(self, 'control_card'):
+            self.control_card.configure(border_color=border_color)
+        if hasattr(self, 'log_card'):
+            self.log_card.configure(border_color=border_color)
         
     def browse_route_file(self):
         """浏览路径文件"""
         filetypes = [
+            ("所有支持的文件", "*.txt;*.json"),
             ("文本文件", "*.txt"),
             ("JSON文件", "*.json"),
             ("所有文件", "*.*")
@@ -165,9 +499,10 @@ class iOSRealRunGUI:
                 initialdir=os.getcwd()
             )
             if filename:
-                # 确保路径使用正确的编码
                 self.route_file_var.set(filename)
                 self.log_message(f"已选择路径文件: {Path(filename).name}")
+                # 自动保存配置
+                self.auto_save_config()
         except Exception as e:
             self.log_message(f"选择文件时出错: {e}")
             messagebox.showerror("错误", f"选择文件时出错: {e}")
@@ -198,12 +533,12 @@ class iOSRealRunGUI:
             # 加载速度配置
             if hasattr(config.config, 'v'):
                 self.speed_var.set(config.config.v)
-                self.speed_label.config(text=f"{config.config.v}")
+                self.update_speed_label(config.config.v)
                 
         except Exception as e:
             self.log_message(f"加载配置失败: {e}")
             
-    def save_config(self):
+    def save_config(self, silent=False):
         """保存配置到config.yaml"""
         try:
             config_data = {
@@ -217,18 +552,37 @@ class iOSRealRunGUI:
             with open("config.yaml", 'w', encoding='utf-8') as f:
                 yaml.dump(config_data, f, default_flow_style=False, allow_unicode=True)
                 
-            self.log_message("配置已保存")
-            messagebox.showinfo("成功", "配置已保存到 config.yaml")
+            if not silent:
+                self.log_message("配置已保存")
+                messagebox.showinfo("成功", "配置已保存到 config.yaml")
+            else:
+                self.log_message("配置已自动保存")
             
         except Exception as e:
             self.log_message(f"保存配置失败: {e}")
-            messagebox.showerror("错误", f"保存配置失败: {e}")
+            if not silent:
+                messagebox.showerror("错误", f"保存配置失败: {e}")
+                
+    def auto_save_config(self):
+        """自动保存配置（延迟保存，避免频繁写入）"""
+        # 取消之前的定时器
+        if self.auto_save_timer:
+            self.root.after_cancel(self.auto_save_timer)
+        
+        # 设置新的定时器，1秒后保存
+        self.auto_save_timer = self.root.after(1000, lambda: self.save_config(silent=True))
             
     def log_message(self, message):
         """添加日志消息"""
-        self.log_text.insert(tk.END, f"{message}\n")
-        self.log_text.see(tk.END)
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        self.log_text.insert("end", f"[{timestamp}] {message}\n")
+        self.log_text.see("end")
         self.root.update_idletasks()
+        
+    def update_status(self, status, color="gray"):
+        """更新状态显示"""
+        self.status_var.set(status)
+        self.status_indicator.configure(text_color=color)
         
     def start_running(self):
         """开始跑步模拟"""
@@ -246,10 +600,9 @@ class iOSRealRunGUI:
             
         # 更新UI状态
         self.is_running = True
-        self.start_button.config(state=tk.DISABLED)
-        self.stop_button.config(state=tk.NORMAL)
-        self.status_var.set("正在启动...")
-        self.status_label.config(foreground="orange")
+        self.start_button.configure(state="disabled")
+        self.stop_button.configure(state="normal")
+        self.update_status("正在启动...", "orange")
         
         # 在新线程中运行
         self.running_thread = threading.Thread(target=self.run_simulation, daemon=True)
@@ -261,8 +614,7 @@ class iOSRealRunGUI:
             return
             
         self.is_running = False
-        self.status_var.set("正在停止...")
-        self.status_label.config(foreground="orange")
+        self.update_status("正在停止...", "orange")
         
         # 终止隧道进程
         if self.tunnel_process and self.tunnel_process.is_alive():
@@ -270,10 +622,9 @@ class iOSRealRunGUI:
             self.log_message("隧道进程已终止")
             
         # 更新UI状态
-        self.start_button.config(state=tk.NORMAL)
-        self.stop_button.config(state=tk.DISABLED)
-        self.status_var.set("已停止")
-        self.status_label.config(foreground="red")
+        self.start_button.configure(state="normal")
+        self.stop_button.configure(state="disabled")
+        self.update_status("已停止", "red")
         self.log_message("跑步模拟已停止")
         
     def run_simulation(self):
@@ -364,8 +715,7 @@ class iOSRealRunGUI:
                     config.config.routeConfig = original_route_config
             
             # 更新状态
-            self.status_var.set("正在跑步...")
-            self.status_label.config(foreground="green")
+            self.update_status("正在跑步...", "green")
             self.log_message(f"已开始模拟跑步，速度大约为 {self.speed_var.get()} m/s")
             self.log_message("会无限循环，点击停止按钮退出")
             self.log_message("请勿直接关闭窗口，否则无法还原正常定位")
@@ -376,8 +726,7 @@ class iOSRealRunGUI:
             
         except Exception as e:
             self.log_message(f"运行出错: {e}")
-            self.status_var.set("运行出错")
-            self.status_label.config(foreground="red")
+            self.update_status("运行出错", "red")
         finally:
             # 清理
             if self.tunnel_process and self.tunnel_process.is_alive():
@@ -385,10 +734,9 @@ class iOSRealRunGUI:
                 self.log_message("隧道进程已终止")
                 
             self.is_running = False
-            self.start_button.config(state=tk.NORMAL)
-            self.stop_button.config(state=tk.DISABLED)
-            self.status_var.set("已停止")
-            self.status_label.config(foreground="red")
+            self.start_button.configure(state="normal")
+            self.stop_button.configure(state="disabled")
+            self.update_status("已停止", "red")
             
     async def run_async(self, loc, speed, speed_variation):
         """异步运行模拟"""
@@ -443,11 +791,7 @@ class iOSRealRunGUI:
 
 def main():
     """主函数"""
-    root = tk.Tk()
-    
-    # 设置样式
-    style = ttk.Style()
-    style.theme_use('clam')
+    root = ctk.CTk()
     
     # 创建应用
     app = iOSRealRunGUI(root)

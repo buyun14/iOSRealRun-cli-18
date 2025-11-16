@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import List, Dict, Optional
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
+import customtkinter as ctk
 
 
 class RouteManager:
@@ -265,36 +266,71 @@ class RouteManagerGUI:
     def show_route_manager(self):
         """显示路径管理器窗口"""
         if self.parent:
-            window = tk.Toplevel(self.parent)
+            # 如果父窗口是 CustomTkinter，使用 CTkToplevel
+            if isinstance(self.parent, ctk.CTk):
+                window = ctk.CTkToplevel(self.parent)
+            else:
+                window = tk.Toplevel(self.parent)
         else:
-            window = tk.Tk()
+            window = ctk.CTk()
             
         window.title("路径管理器")
-        window.geometry("800x600")
+        window.geometry("900x650")
         
-        # 创建主框架
-        main_frame = ttk.Frame(window, padding="10")
-        main_frame.pack(fill=tk.BOTH, expand=True)
+        # 创建主容器
+        main_container = ctk.CTkFrame(window)
+        main_container.pack(fill="both", expand=True, padx=20, pady=20)
         
-        # 标题
-        title_label = ttk.Label(main_frame, text="路径管理器", font=("Arial", 16, "bold"))
-        title_label.pack(pady=(0, 20))
+        # 标题栏
+        header_frame = ctk.CTkFrame(main_container, fg_color="transparent")
+        header_frame.pack(fill="x", pady=(0, 20))
+        
+        title_label = ctk.CTkLabel(
+            header_frame,
+            text="📁 路径管理器",
+            font=ctk.CTkFont(size=20, weight="bold")
+        )
+        title_label.pack(side="left")
         
         # 按钮框架
-        button_frame = ttk.Frame(main_frame)
-        button_frame.pack(fill=tk.X, pady=(0, 10))
+        button_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+        button_frame.pack(side="right")
         
-        ttk.Button(button_frame, text="刷新列表", command=self.refresh_route_list).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(button_frame, text="导入路径", command=self.import_route).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(button_frame, text="转换格式", command=self.convert_format).pack(side=tk.LEFT, padx=(0, 10))
+        ctk.CTkButton(
+            button_frame,
+            text="🔄 刷新列表",
+            command=self.refresh_route_list,
+            width=120,
+            height=35
+        ).pack(side="left", padx=(0, 10))
         
-        # 路径列表
-        list_frame = ttk.Frame(main_frame)
-        list_frame.pack(fill=tk.BOTH, expand=True)
+        ctk.CTkButton(
+            button_frame,
+            text="📥 导入路径",
+            command=self.import_route,
+            width=120,
+            height=35
+        ).pack(side="left", padx=(0, 10))
+        
+        ctk.CTkButton(
+            button_frame,
+            text="🔄 转换格式",
+            command=self.convert_format,
+            width=120,
+            height=35
+        ).pack(side="left")
+        
+        # 路径列表容器
+        list_container = ctk.CTkFrame(main_container)
+        list_container.pack(fill="both", expand=True)
+        
+        # 使用 tkinter 的 Frame 来容纳 Treeview（因为 CustomTkinter 没有 Treeview）
+        list_frame = tk.Frame(list_container)
+        list_frame.pack(fill="both", expand=True, padx=10, pady=10)
         
         # 创建Treeview
         columns = ("名称", "格式", "描述", "距离", "坐标数", "创建时间")
-        self.tree = ttk.Treeview(list_frame, columns=columns, show="headings", height=15)
+        self.tree = ttk.Treeview(list_frame, columns=columns, show="headings", height=20)
         
         # 设置列标题和宽度
         for col in columns:
@@ -317,8 +353,9 @@ class RouteManagerGUI:
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # 右键菜单
-        self.context_menu = tk.Menu(window, tearoff=0)
+        # 右键菜单（使用 tkinter 的 Menu，因为 CustomTkinter 没有原生右键菜单）
+        # 直接使用 list_frame 作为父窗口来创建菜单
+        self.context_menu = tk.Menu(list_frame, tearoff=0)
         self.context_menu.add_command(label="删除", command=self.delete_selected_route)
         self.context_menu.add_command(label="导出", command=self.export_selected_route)
         self.context_menu.add_command(label="查看详情", command=self.view_route_details)
@@ -326,31 +363,42 @@ class RouteManagerGUI:
         self.tree.bind("<Button-3>", self.show_context_menu)
         self.tree.bind("<Double-1>", self.select_route)
         
-        # 加载路径列表
-        self.refresh_route_list()
+        # 保存窗口引用和 tree 引用
+        self.window = window
+        self.tree_widget = self.tree
+        
+        # 立即加载路径列表（使用 after 确保窗口完全创建后再加载）
+        window.after(100, self.refresh_route_list)
         
         return window
         
     def refresh_route_list(self):
         """刷新路径列表"""
+        # 检查 tree 是否存在
+        if not hasattr(self, 'tree') or self.tree is None:
+            return
+            
         # 清空现有项目
         for item in self.tree.get_children():
             self.tree.delete(item)
             
         # 加载路径
-        routes = self.route_manager.get_route_list()
-        for route in routes:
-            distance_text = f"{route['distance']:.1f}m" if route['distance'] > 0 else "未知"
-            created_text = route['created'] if route['created'] else "未知"
-            
-            self.tree.insert("", tk.END, values=(
-                route['name'],
-                route['format'].upper(),
-                route['description'],
-                distance_text,
-                route['coordinates_count'],
-                created_text
-            ), tags=(route['file_path'],))
+        try:
+            routes = self.route_manager.get_route_list()
+            for route in routes:
+                distance_text = f"{route['distance']:.1f}m" if route['distance'] > 0 else "未知"
+                created_text = route['created'] if route['created'] else "未知"
+                
+                self.tree.insert("", tk.END, values=(
+                    route['name'],
+                    route['format'].upper(),
+                    route['description'],
+                    distance_text,
+                    route['coordinates_count'],
+                    created_text
+                ), tags=(route['file_path'],))
+        except Exception as e:
+            print(f"刷新路径列表时出错: {e}")
             
     def show_context_menu(self, event):
         """显示右键菜单"""
@@ -386,17 +434,38 @@ class RouteManagerGUI:
         route_name = self.tree.item(item, "values")[0]
         
         # 选择导出格式
-        format_dialog = tk.Toplevel()
+        format_dialog = ctk.CTkToplevel()
         format_dialog.title("选择导出格式")
-        format_dialog.geometry("300x150")
+        format_dialog.geometry("350x200")
         format_dialog.transient()
         format_dialog.grab_set()
         
-        ttk.Label(format_dialog, text="选择导出格式:").pack(pady=10)
+        main_dialog_frame = ctk.CTkFrame(format_dialog)
+        main_dialog_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
-        format_var = tk.StringVar(value="json")
-        ttk.Radiobutton(format_dialog, text="JSON格式", variable=format_var, value="json").pack()
-        ttk.Radiobutton(format_dialog, text="TXT格式", variable=format_var, value="txt").pack()
+        ctk.CTkLabel(
+            main_dialog_frame,
+            text="选择导出格式:",
+            font=ctk.CTkFont(size=14, weight="bold")
+        ).pack(pady=(10, 20))
+        
+        format_var = ctk.StringVar(value="json")
+        
+        ctk.CTkRadioButton(
+            main_dialog_frame,
+            text="JSON格式",
+            variable=format_var,
+            value="json",
+            font=ctk.CTkFont(size=14)
+        ).pack(pady=5)
+        
+        ctk.CTkRadioButton(
+            main_dialog_frame,
+            text="TXT格式",
+            variable=format_var,
+            value="txt",
+            font=ctk.CTkFont(size=14)
+        ).pack(pady=5)
         
         def do_export():
             format_dialog.destroy()
@@ -413,10 +482,16 @@ class RouteManagerGUI:
                 else:
                     messagebox.showerror("错误", "导出失败")
                     
-        ttk.Button(format_dialog, text="导出", command=do_export).pack(pady=10)
+        ctk.CTkButton(
+            main_dialog_frame,
+            text="导出",
+            command=do_export,
+            width=120,
+            height=35
+        ).pack(pady=(20, 10))
         
     def view_route_details(self):
-        """查看路径详情"""
+        """查看路径详情 - 使用自定义窗口"""
         selection = self.tree.selection()
         if not selection:
             return
@@ -425,27 +500,100 @@ class RouteManagerGUI:
         file_path = self.tree.item(item, "tags")[0]
         
         try:
+            # 创建详情窗口
+            detail_window = ctk.CTkToplevel(self.window)
+            detail_window.title("路径详情")
+            detail_window.geometry("450x400")
+            detail_window.transient(self.window)
+            detail_window.grab_set()
+            
+            # 主容器
+            main_frame = ctk.CTkFrame(detail_window)
+            main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+            
+            # 标题
+            title_label = ctk.CTkLabel(
+                main_frame,
+                text="📋 路径详情",
+                font=ctk.CTkFont(size=20, weight="bold")
+            )
+            title_label.pack(pady=(0, 20))
+            
+            # 详情内容区域
+            content_frame = ctk.CTkScrollableFrame(main_frame)
+            content_frame.pack(fill="both", expand=True, pady=(0, 20))
+            
             if file_path.endswith('.json'):
                 route_data = self.route_manager.load_route_json(file_path)
-                details = f"名称: {route_data['name']}\n"
-                details += f"坐标数量: {len(route_data['coordinates'])}\n"
-                details += f"描述: {route_data['metadata'].get('description', '无')}\n"
-                details += f"距离: {route_data['metadata'].get('distance', 0):.1f}米\n"
-                details += f"创建时间: {route_data['metadata'].get('created', '未知')}\n"
+                
+                # 创建详情项
+                self._create_detail_item(content_frame, "名称", route_data['name'])
+                self._create_detail_item(content_frame, "格式", "JSON")
+                self._create_detail_item(content_frame, "坐标数量", f"{len(route_data['coordinates'])} 个")
+                self._create_detail_item(content_frame, "距离", f"{route_data['metadata'].get('distance', 0):.1f} 米")
+                desc = route_data['metadata'].get('description', '无')
+                if desc and desc != '无':
+                    self._create_detail_item(content_frame, "描述", desc, multiline=True)
+                created = route_data['metadata'].get('created', '未知')
+                if created and created != '未知':
+                    self._create_detail_item(content_frame, "创建时间", created)
             else:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     content = f.read().strip()
                 from util.route import parse_route
                 coordinates = parse_route(content)
                 distance = self.route_manager.calculate_route_distance(coordinates)
-                details = f"名称: {Path(file_path).stem}\n"
-                details += f"坐标数量: {len(coordinates)}\n"
-                details += f"距离: {distance:.1f}米\n"
-                details += f"格式: 传统TXT格式\n"
                 
-            messagebox.showinfo("路径详情", details)
+                self._create_detail_item(content_frame, "名称", Path(file_path).stem)
+                self._create_detail_item(content_frame, "格式", "TXT")
+                self._create_detail_item(content_frame, "坐标数量", f"{len(coordinates)} 个")
+                self._create_detail_item(content_frame, "距离", f"{distance:.1f} 米")
+            
+            # 关闭按钮
+            close_button = ctk.CTkButton(
+                main_frame,
+                text="关闭",
+                command=detail_window.destroy,
+                width=120,
+                height=35
+            )
+            close_button.pack(pady=(10, 0))
+            
         except Exception as e:
             messagebox.showerror("错误", f"读取路径详情失败: {e}")
+            
+    def _create_detail_item(self, parent, label, value, multiline=False):
+        """创建详情项"""
+        item_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        item_frame.pack(fill="x", pady=8)
+        
+        label_widget = ctk.CTkLabel(
+            item_frame,
+            text=f"{label}:",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            width=100,
+            anchor="w"
+        )
+        label_widget.pack(side="left", padx=(0, 10))
+        
+        if multiline:
+            value_widget = ctk.CTkTextbox(
+                item_frame,
+                height=60,
+                font=ctk.CTkFont(size=12),
+                wrap="word"
+            )
+            value_widget.insert("1.0", value)
+            value_widget.configure(state="disabled")
+            value_widget.pack(side="left", fill="x", expand=True)
+        else:
+            value_widget = ctk.CTkLabel(
+                item_frame,
+                text=value,
+                font=ctk.CTkFont(size=13),
+                anchor="w"
+            )
+            value_widget.pack(side="left", fill="x", expand=True)
             
     def select_route(self, event):
         """选择路径（双击）"""
